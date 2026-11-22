@@ -7,6 +7,7 @@ import ujson
 import gc
 import socket
 import sys
+import os
 from umqtt.simple import MQTTClient
 import secrets
 
@@ -638,14 +639,13 @@ def responder(cliente, codigo, tipo, corpo):
     cabecalho = (
         "HTTP/1.1 {}\r\n"
         "Content-Type: {}\r\n"
+        "Content-Length: {}\r\n"
         "Cache-Control: no-store\r\n"
         "Connection: close\r\n\r\n"
-    ).format(codigo, tipo)
+    ).format(codigo, tipo, len(corpo))
 
-    cliente.sendall(cabecalho.encode())
-
-    if corpo:
-        cliente.sendall(corpo)
+    # cabecalho e corpo em um unico envio
+    cliente.sendall(cabecalho.encode() + corpo)
 
 
 def enviar_pagina(cliente):
@@ -656,11 +656,14 @@ def enviar_pagina(cliente):
         responder(cliente, "404 Not Found", "text/plain", b"index.html nao encontrado")
         return
 
+    tamanho = os.stat("index.html")[6]
+
     cabecalho = (
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html; charset=utf-8\r\n"
+        "Content-Length: {}\r\n"
         "Connection: close\r\n\r\n"
-    )
+    ).format(tamanho)
     cliente.sendall(cabecalho.encode())
 
     while True:
@@ -683,7 +686,7 @@ def atender_http():
         return   # nenhum cliente esperando
 
     try:
-        cliente.settimeout(3)
+        cliente.settimeout(1)
 
         requisicao = cliente.recv(1024)
         primeira_linha = requisicao.split(b"\r\n")[0].decode()
@@ -707,6 +710,7 @@ def atender_http():
         print("Erro HTTP:", erro)
 
     finally:
+        time.sleep_ms(200)   # deixa o envio terminar antes de fechar a conexao
         cliente.close()
 
 
