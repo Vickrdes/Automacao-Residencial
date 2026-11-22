@@ -3,3 +3,7 @@ version = 1
 firmware = 'firmware.bin'
 elf = 'firmware.bin'
 rfc2217ServerPort = 4000
+
+[[net.forward]]
+from = "localhost:8180"
+to = "target:80"
