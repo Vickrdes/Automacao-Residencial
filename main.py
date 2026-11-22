@@ -5,6 +5,8 @@ import time
 import network
 import ujson
 import gc
+import socket
+import sys
 from umqtt.simple import MQTTClient
 import secrets
 
@@ -41,21 +43,20 @@ TOPICOS_CONTROLE = [
 # Configuracoes da automacao do ventilador (buzzer)
 TEMP_LIGAR_VENTILADOR = 30
 TEMP_DESLIGAR_VENTILADOR = 28
+DISTANCIA_ALERTA_CM = 20
 
 modo_ventilador = "AUTO"
-
-
 
 
 # Configuracao dos sensores
 # DHT22: Temperatura e umidade
 dht_sensor = dht.DHT22(Pin(15))
 
-# HC-SR04:  Distancia 
+# HC-SR04: Distancia
 trig = Pin(5, Pin.OUT)
 echo = Pin(18, Pin.IN)
 
-# PIR: Movimento 
+# PIR: Movimento
 pir = Pin(19, Pin.IN)
 
 # LDR: Luminosidade
@@ -68,17 +69,15 @@ ldr.atten(ADC.ATTN_11DB)
 led_sala = Pin(25, Pin.OUT)
 led_sala.value(0)
 
-# LED do quarto: azul 
+# LED do quarto: azul
 led_quarto = Pin(26, Pin.OUT)
 led_quarto.value(0)
 
-# Servo: Portao 
+# Servo: Portao
 servo = PWM(Pin(27), freq=50)
 
-# Ventilador
+# Ventilador (buzzer)
 buzzer = PWM(Pin(23), freq=1000, duty_u16=0)
-
-
 
 
 # Display OLED
@@ -86,10 +85,9 @@ display = None
 
 try:
     import ssd1306
-    import sys
 
     i2c = I2C(0, scl=Pin(22), sda=Pin(21))
-    print("I2C scan:", i2c.scan())   
+    print("I2C scan:", i2c.scan())   # esperado: [60]
 
     display = ssd1306.SSD1306_I2C(128, 64, i2c)
 
@@ -110,12 +108,22 @@ estado_portao = False
 estado_ventilador = False
 
 mqtt = None
+servidor = None
+
+# Ultima leitura dos sensores (usada pela pagina web)
+ultimos_dados = {}
 
 # Controle de alertas anteriores
 alerta_temperatura_anterior = False
 alerta_movimento_anterior = False
 alerta_distancia_anterior = False
 
+# Nomes curtos dos alertas para o OLED (cabem em 16 caracteres)
+NOME_CURTO = {
+    "temperatura alta": "TEMP ALTA",
+    "movimento detectado": "MOVIMENTO",
+    "objeto proximo ao portao": "OBJ PROXIMO"
+}
 
 
 # Funcoes de leitura dos sensores
@@ -135,8 +143,6 @@ def ler_temperatura_umidade():
         return None, None
 
 
-
-
 def ler_distancia():
 
     try:
@@ -150,6 +156,10 @@ def ler_distancia():
 
         duracao = time_pulse_us(echo, 1, 30000)
 
+        # Valor negativo significa que nao houve eco (timeout)
+        if duracao < 0:
+            return None
+
         distancia = (duracao * 0.0343) / 2
 
         return round(distancia, 2)
@@ -159,17 +169,14 @@ def ler_distancia():
         return None
 
 
-
 def ler_movimento():
 
     return pir.value()
 
 
-
 def ler_luminosidade():
 
     return ldr.read()
-
 
 
 def ler_sensores():
@@ -189,7 +196,6 @@ def ler_sensores():
         "movimento": movimento,
         "luminosidade": luminosidade
     }
-
 
 
 # Funcoes de controle dos atuadores
@@ -233,14 +239,12 @@ def controlar_portao(estado):
     print("Portao:", "ABERTO" if estado_portao else "FECHADO")
 
 
-
 def controlar_ventilador(estado):
 
     global estado_ventilador
 
     estado_ventilador = bool(estado)
 
-    
     if estado_ventilador:
         buzzer.freq(1000)
         buzzer.duty_u16(16384)
@@ -250,13 +254,32 @@ def controlar_ventilador(estado):
     print("Ventilador (buzzer):", "LIGADO" if estado_ventilador else "DESLIGADO")
 
 
+def definir_ventilador(modo):
+    # Usada pelo MQTT e pela pagina web: AUTO, ON ou OFF
+
+    global modo_ventilador
+
+    modo = modo.upper()
+
+    if modo == "AUTO":
+
+        modo_ventilador = "AUTO"
+        print("Ventilador em modo automatico")
+
+    elif modo == "ON":
+
+        modo_ventilador = "ON"
+        controlar_ventilador(True)
+
+    elif modo == "OFF":
+
+        modo_ventilador = "OFF"
+        controlar_ventilador(False)
 
 
 # Controle automatico do ventilador por temperatura
 
 def controlar_temperatura(temperatura):
-
-    global modo_ventilador
 
     if temperatura is None:
         return
@@ -270,13 +293,9 @@ def controlar_temperatura(temperatura):
             controlar_ventilador(False)
 
 
-
-
 # Recebimento de comandos MQTT
 
 def receber_mensagem_mqtt(topico, mensagem):
-
-    global modo_ventilador
 
     topico = topico.decode()
     mensagem = mensagem.decode().strip().upper()
@@ -301,25 +320,31 @@ def receber_mensagem_mqtt(topico, mensagem):
 
     elif topico == TOPICO_VENTILADOR:
 
-        if mensagem == "AUTO":
-
-            modo_ventilador = "AUTO"
-            print("Ventilador em modo automatico")
-
-        elif mensagem == "ON":
-
-            modo_ventilador = "ON"
-            controlar_ventilador(True)
-
-        elif mensagem == "OFF":
-
-            modo_ventilador = "OFF"
-            controlar_ventilador(False)
+        definir_ventilador(mensagem)
 
 
+# Alertas atualmente ativos (usados na pagina web e no OLED)
+
+def alertas_ativos(dados):
+
+    ativos = []
+
+    temperatura = dados.get("temperatura")
+    distancia = dados.get("distancia")
+
+    if temperatura is not None and temperatura >= TEMP_LIGAR_VENTILADOR:
+        ativos.append("temperatura alta")
+
+    if dados.get("movimento") == 1:
+        ativos.append("movimento detectado")
+
+    if distancia is not None and distancia <= DISTANCIA_ALERTA_CM:
+        ativos.append("objeto proximo ao portao")
+
+    return ativos
 
 
-# Verificacao de alertas
+# Verificacao de alertas (gera o alerta uma vez, quando o evento comeca)
 
 def verificar_alertas(dados):
 
@@ -363,7 +388,7 @@ def verificar_alertas(dados):
 
     # Alerta de proximidade
     distancia_baixa = (
-        distancia is not None and distancia <= 20
+        distancia is not None and distancia <= DISTANCIA_ALERTA_CM
     )
 
     if distancia_baixa and not alerta_distancia_anterior:
@@ -379,8 +404,8 @@ def verificar_alertas(dados):
     return alertas
 
 
-
 # Atualizacao do display OLED
+
 def atualizar_display(dados, status_mqtt):
 
     if display is None:
@@ -398,15 +423,27 @@ def atualizar_display(dados, status_mqtt):
         display.text("Temp: {} C".format(temperatura if temperatura is not None else "--"), 0, 10)
         display.text("Umid: {} %".format(umidade if umidade is not None else "--"), 0, 20)
         display.text("Dist: {} cm".format(distancia if distancia is not None else "--"), 0, 30)
-        display.text("Mov: {}".format("SIM" if movimento else "NAO"), 0, 40)
-        display.text("Vent:{} MQTT:{}".format("ON" if estado_ventilador else "OFF", status_mqtt), 0, 50)
+        display.text("Mov:{} Vent:{}".format(
+            "SIM" if movimento else "NAO",
+            "ON" if estado_ventilador else "OFF"
+        ), 0, 40)
+
+        # Ultima linha: alertas ativos no momento
+        ativos = alertas_ativos(dados)
+
+        if ativos:
+            linha = "! " + NOME_CURTO[ativos[0]]
+            if len(ativos) > 1:
+                linha += " +{}".format(len(ativos) - 1)
+        else:
+            linha = "Sem alertas"
+
+        display.text(linha, 0, 52)
 
         display.show()
 
     except Exception as erro:
         print("Erro no OLED:", erro)
-
-
 
 
 # Conexao Wi-Fi
@@ -434,8 +471,6 @@ def conectar_wifi():
     print("IP:", wlan.ifconfig()[0])
 
     return wlan
-
-
 
 
 # Conexao MQTT
@@ -474,12 +509,9 @@ def conectar_mqtt():
         return None
 
 
-
 # Publicacao dos dados via MQTT
 
 def enviar_telemetria(dados):
-
-    global mqtt
 
     if mqtt is None:
         return
@@ -506,12 +538,9 @@ def enviar_telemetria(dados):
         print("Erro ao publicar telemetria:", erro)
 
 
-
 # Envio dos alertas via MQTT
 
 def enviar_alertas(alertas):
-
-    global mqtt
 
     if mqtt is None:
         return
@@ -532,8 +561,153 @@ def enviar_alertas(alertas):
             print("Erro ao enviar alerta:", erro)
 
 
+# Servidor web (pagina index.html hospedada no ESP32)
+
+def iniciar_servidor():
+
+    global servidor
+
+    try:
+        servidor = socket.socket()
+        servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        servidor.bind(("0.0.0.0", 80))
+        servidor.listen(3)
+        servidor.setblocking(False)
+
+        print("Servidor web ativo na porta 80")
+
+    except Exception as erro:
+        servidor = None
+        print("Erro ao iniciar servidor web:", erro)
 
 
+def montar_estado():
+
+    d = ultimos_dados
+
+    return ujson.dumps({
+        "temp": d.get("temperatura"),
+        "umid": d.get("umidade"),
+        "dist": d.get("distancia"),
+        "pir": d.get("movimento", 0),
+        "luz": d.get("luminosidade", 0),
+        "luz_sala": estado_luz_sala,
+        "luz_quarto": estado_luz_quarto,
+        "portao": estado_portao,
+        "vent": estado_ventilador,
+        "modo": modo_ventilador,
+        "alerta": ", ".join(alertas_ativos(d))
+    })
+
+
+def ler_parametros(caminho):
+
+    params = {}
+
+    if "?" in caminho:
+        for par in caminho.split("?", 1)[1].split("&"):
+            if "=" in par:
+                chave, valor = par.split("=", 1)
+                params[chave] = valor
+
+    return params
+
+
+def aplicar_comando(params):
+
+    dispositivo = params.get("dev", "")
+    valor = params.get("val", "")
+
+    print("HTTP comando:", dispositivo, valor)
+
+    if dispositivo == "luz_sala":
+        controlar_luz_sala(valor == "1")
+
+    elif dispositivo == "luz_quarto":
+        controlar_luz_quarto(valor == "1")
+
+    elif dispositivo == "portao":
+        controlar_portao(valor == "1")
+
+    elif dispositivo == "ventilador":
+        definir_ventilador(valor)
+
+
+def responder(cliente, codigo, tipo, corpo):
+
+    cabecalho = (
+        "HTTP/1.1 {}\r\n"
+        "Content-Type: {}\r\n"
+        "Cache-Control: no-store\r\n"
+        "Connection: close\r\n\r\n"
+    ).format(codigo, tipo)
+
+    cliente.sendall(cabecalho.encode())
+
+    if corpo:
+        cliente.sendall(corpo)
+
+
+def enviar_pagina(cliente):
+
+    try:
+        arquivo = open("index.html", "rb")
+    except OSError:
+        responder(cliente, "404 Not Found", "text/plain", b"index.html nao encontrado")
+        return
+
+    cabecalho = (
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html; charset=utf-8\r\n"
+        "Connection: close\r\n\r\n"
+    )
+    cliente.sendall(cabecalho.encode())
+
+    while True:
+        bloco = arquivo.read(512)
+        if not bloco:
+            break
+        cliente.sendall(bloco)
+
+    arquivo.close()
+
+
+def atender_http():
+
+    if servidor is None:
+        return
+
+    try:
+        cliente, _ = servidor.accept()
+    except OSError:
+        return   # nenhum cliente esperando
+
+    try:
+        cliente.settimeout(3)
+
+        requisicao = cliente.recv(1024)
+        primeira_linha = requisicao.split(b"\r\n")[0].decode()
+        partes = primeira_linha.split(" ")
+        caminho = partes[1] if len(partes) > 1 else "/"
+
+        if caminho.startswith("/api/cmd"):
+            aplicar_comando(ler_parametros(caminho))
+            responder(cliente, "200 OK", "application/json", montar_estado().encode())
+
+        elif caminho.startswith("/api/estado"):
+            responder(cliente, "200 OK", "application/json", montar_estado().encode())
+
+        elif caminho == "/" or caminho.startswith("/index.html"):
+            enviar_pagina(cliente)
+
+        else:
+            responder(cliente, "404 Not Found", "text/plain", b"nao encontrado")
+
+    except Exception as erro:
+        print("Erro HTTP:", erro)
+
+    finally:
+        cliente.close()
 
 
 # Loop principal
@@ -541,8 +715,11 @@ def enviar_alertas(alertas):
 def iniciar_sistema():
 
     global mqtt
+    global ultimos_dados
 
     conectar_wifi()
+
+    iniciar_servidor()
 
     mqtt = conectar_mqtt()
 
@@ -550,12 +727,9 @@ def iniciar_sistema():
 
         try:
 
-            # Verifica se existem comandos recebidos
-            if mqtt is not None:
-                mqtt.check_msg()
-
             # Leitura dos sensores
             dados = ler_sensores()
+            ultimos_dados = dados
 
             # Controle automatico do ventilador
             controlar_temperatura(dados["temperatura"])
@@ -586,11 +760,15 @@ def iniciar_sistema():
 
             gc.collect()
 
-            # espera 5 s no total, mas verifica comandos MQTT a cada 0,5 s
-            for _ in range(10):
+            # Espera 5 s, mas atende comandos MQTT e a pagina web a cada 0,1 s
+            for _ in range(50):
+
                 if mqtt is not None:
                     mqtt.check_msg()
-                time.sleep(0.5)
+
+                atender_http()
+
+                time.sleep(0.1)
 
         except Exception as erro:
 

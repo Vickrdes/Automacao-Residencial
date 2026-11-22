@@ -6,7 +6,7 @@ while ($true) {
         Start-Sleep -Seconds 2
     }
 
-    foreach ($arq in "ssd1306.py", "secrets.py", "main.py") {
+    foreach ($arq in "ssd1306.py", "secrets.py", "index.html", "main.py") {
         mpremote connect $porta fs cp $arq ":$arq"
     }
     mpremote connect $porta reset
