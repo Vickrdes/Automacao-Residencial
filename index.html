@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Casa Inteligente</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#1b2a3a;--mut:#5b6b7b;--bd:#d5dce3;--az:#0d74ce;--ok:#218447;--err:#c0392b}
+@media(prefers-color-scheme:dark){:root{--bg:#10161d;--card:#18212b;--tx:#e6edf4;--mut:#93a4b5;--bd:#2c3947;--az:#4da3ee;--ok:#3cc0a6;--err:#ff7a6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,Arial,sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{margin:0 0 4px;font-size:1.5rem}
+#conexao{font-size:.85rem;color:var(--err)}
+#conexao.ok{color:var(--ok)}
+h2{margin:20px 0 8px;font-size:1rem;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+.grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px}
+.rot{font-size:.8rem;color:var(--mut)}
+.num{font-size:1.7rem;font-weight:700}
+.est{font-weight:700;margin:6px 0 10px}
+.on{color:var(--ok)}
+.btns{display:flex;gap:6px}
+button{flex:1;padding:8px;border:1px solid var(--az);border-radius:8px;background:transparent;color:var(--az);font:inherit;font-weight:600;cursor:pointer}
+button:hover{background:var(--az);color:#fff}
+#alerta{display:none;margin:12px 0;padding:12px;border-radius:8px;background:var(--err);color:#fff;font-weight:600}
+#alerta.ativo{display:block}
+</style>
+</head>
+<body>
+<main>
+  <h1>Casa Inteligente</h1>
+  <span id="conexao">Conectando...</span>
+  <div id="alerta" role="alert"></div>
+
+  <h2>Sensores</h2>
+  <div class="grade">
+    <div class="card"><div class="rot">Temperatura</div><div class="num"><span id="temp">--</span> °C</div></div>
+    <div class="card"><div class="rot">Umidade</div><div class="num"><span id="umid">--</span> %</div></div>
+    <div class="card"><div class="rot">Distância (portão)</div><div class="num"><span id="dist">--</span> cm</div></div>
+    <div class="card"><div class="rot">Movimento</div><div class="num" id="pir">--</div></div>
+    <div class="card"><div class="rot">Luminosidade</div><div class="num" id="luz">--</div></div>
+  </div>
+
+  <h2>Atuadores</h2>
+  <div class="grade">
+    <div class="card"><div class="rot">Luz da sala</div><div class="est" id="luz_sala">--</div>
+      <div class="btns"><button onclick="cmd('luz_sala',1)">Ligar</button><button onclick="cmd('luz_sala',0)">Desligar</button></div></div>
+    <div class="card"><div class="rot">Luz do quarto</div><div class="est" id="luz_quarto">--</div>
+      <div class="btns"><button onclick="cmd('luz_quarto',1)">Ligar</button><button onclick="cmd('luz_quarto',0)">Desligar</button></div></div>
+    <div class="card"><div class="rot">Portão</div><div class="est" id="portao">--</div>
+      <div class="btns"><button onclick="cmd('portao',1)">Abrir</button><button onclick="cmd('portao',0)">Fechar</button></div></div>
+    <div class="card"><div class="rot">Ventilador</div><div class="est" id="vent">--</div>
+      <div class="btns"><button onclick="cmd('ventilador','auto')">Auto</button><button onclick="cmd('ventilador','on')">Ligar</button><button onclick="cmd('ventilador','off')">Desligar</button></div></div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function mostra(id, ligado, on, off) {
+  $(id).textContent = ligado ? on : off;
+  $(id).className = 'est' + (ligado ? ' on' : '');
+}
+
+function render(d) {
+  $('temp').textContent = d.temp == null ? '--' : Number(d.temp).toFixed(1);
+  $('umid').textContent = d.umid == null ? '--' : Math.round(d.umid);
+  $('dist').textContent = d.dist == null ? '--' : Number(d.dist).toFixed(1);
+  $('pir').textContent = d.pir ? 'Detectado' : 'Sem movimento';
+  $('luz').textContent = d.luz;
+  mostra('luz_sala', d.luz_sala, 'Ligada', 'Desligada');
+  mostra('luz_quarto', d.luz_quarto, 'Ligada', 'Desligada');
+  mostra('portao', d.portao, 'Aberto', 'Fechado');
+  $('vent').textContent = (d.vent ? 'Ligado' : 'Desligado') + ' (modo ' + d.modo + ')';
+  $('vent').className = 'est' + (d.vent ? ' on' : '');
+  $('alerta').textContent = d.alerta ? 'Alerta: ' + d.alerta : '';
+  $('alerta').className = d.alerta ? 'ativo' : '';
+}
+
+async function chamar(url) {
+  try {
+    const r = await fetch(url, {cache: 'no-store'});
+    if (!r.ok) throw new Error(r.status);
+    render(await r.json());
+    $('conexao').textContent = 'Conectado ao ESP32';
+    $('conexao').className = 'ok';
+  } catch (e) {
+    $('conexao').textContent = 'Sem conexão com o ESP32';
+    $('conexao').className = '';
+  }
+}
+
+const cmd = (dev, val) => chamar('/api/cmd?dev=' + dev + '&val=' + val);
+
+chamar('/api/estado');
+setInterval(() => chamar('/api/estado'), 2000);
+</script>
+</body>
+</html>
