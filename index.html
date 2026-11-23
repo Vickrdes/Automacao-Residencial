@@ -1,39 +1,118 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Casa Inteligente</title>
-<style>
-body{margin:0;background:#f4f6f8;color:#1b2a3a;font:16px system-ui,Arial}
-main{max-width:720px;margin:auto;padding:16px}
-h2{font-size:.9rem;color:#5b6b7b;text-transform:uppercase}
-.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.c{background:#fff;border:1px solid #d5dce3;border-radius:12px;padding:12px}
-small{color:#5b6b7b}.v{font-size:1.4rem;font-weight:700;margin:6px 0}
-.b{display:flex;gap:6px}
-button{flex:1;padding:8px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:600;cursor:pointer}
-#a{display:none;background:#c0392b;color:#fff;padding:10px;border-radius:8px;margin:10px 0}
-#s{color:#c0392b;font-size:.85rem}
-</style></head><body><main>
-<h1>Casa Inteligente</h1><span id="s">Conectando...</span><div id="a"></div>
-<h2>Sensores</h2><div class="g" id="S"></div>
-<h2>Atuadores</h2><div class="g" id="A"></div></main>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Casa Inteligente</title>
+  <style>
+    body    { margin: 0; background: #d6f2dc; color: #1f3d2b; font: 16px system-ui, Arial; }
+    main    { max-width: 720px; margin: auto; padding: 16px; }
+    h2      { font-size: .9rem; color: #3d6b4f; text-transform: uppercase; }
+    small   { color: #4f7a5f; }
+
+    .grade  { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .card   { background: #fff; border: 1px solid #b7e0c0; border-radius: 12px; padding: 12px; }
+    .valor  { font-size: 1.4rem; font-weight: 700; margin: 6px 0; }
+    .botoes { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    button       { flex: 1 1 auto; min-width: 0; padding: 8px 6px; border: 0; border-radius: 8px;
+                   background: #2f8f5f; color: #fff; font-weight: 700; cursor: pointer; }
+    button:hover { background: #25764e; }
+
+    #alerta { display: none; background: #c0392b; color: #fff; padding: 10px;
+              border-radius: 8px; margin: 10px 0; }
+    #status { color: #c0392b; font-size: .85rem; }
+  </style>
+</head>
+
+<body>
+<main>
+  <h1>Casa Inteligente</h1>
+  <span id="status">Conectando...</span>
+  <div id="alerta"></div>
+
+  <h2>Sensores</h2>
+  <div class="grade" id="sensores"></div>
+
+  <h2>Atuadores</h2>
+  <div class="grade" id="atuadores"></div>
+</main>
+
 <script>
-const $=i=>document.getElementById(i);
-const SE=[['temp','Temperatura','°C'],['umid','Umidade','%'],['dist','Distância (portão)','cm'],['pir','Movimento',''],['luz','Luminosidade','']];
-const AT=[['luz_sala','Luz da sala',[['Ligar',1],['Desligar',0]]],['luz_quarto','Luz do quarto',[['Ligar',1],['Desligar',0]]],['portao','Portão',[['Abrir',1],['Fechar',0]]],['ventilador','Ventilador',[['Auto','auto'],['Ligar','on'],['Desligar','off']]]];
-$('S').innerHTML=SE.map(x=>`<div class=c><small>${x[1]}</small><div class=v><span id=k_${x[0]}>--</span> ${x[2]}</div></div>`).join('');
-$('A').innerHTML=AT.map(x=>`<div class=c><small>${x[1]}</small><div class=v id=e_${x[0]}>--</div><div class=b>${x[2].map(b=>`<button onclick="cmd('${x[0]}','${b[1]}')">${b[0]}</button>`).join('')}</div></div>`).join('');
-const t=(i,v)=>$(i).textContent=v;
-function R(d){
-t('k_temp',d.temp==null?'--':d.temp.toFixed(1));
-t('k_umid',d.umid==null?'--':Math.round(d.umid));
-t('k_dist',d.dist==null?'--':d.dist.toFixed(1));
-t('k_pir',d.pir?'Detectado':'Sem movimento');
-t('k_luz',d.luz);
-t('e_luz_sala',d.luz_sala?'Ligada':'Desligada');
-t('e_luz_quarto',d.luz_quarto?'Ligada':'Desligada');
-t('e_portao',d.portao?'Aberto':'Fechado');
-t('e_ventilador',(d.vent?'Ligado':'Desligado')+' ('+d.modo+')');
-t('a',d.alerta?'Alerta: '+d.alerta:'');
-$('a').style.display=d.alerta?'block':'none';}
-async function C(u){try{const r=await fetch(u,{cache:'no-store'});R(await r.json());t('s','Conectado ao ESP32');$('s').style.color='#218447'}catch(e){console.log(e);t('s','Erro: '+e.message);$('s').style.color='#c0392b'}}
-const cmd=(d,v)=>C('/api/cmd?dev='+d+'&val='+v);
-C('/api/estado');setInterval(()=>C('/api/estado'),2000);
-</script></body></html>
+  const $ = id => document.getElementById(id);
+  const texto = (id, valor) => $(id).textContent = valor;
+
+  // Sensores: [chave no JSON, nome, unidade]
+  const SENSORES = [
+    ['temp', 'Temperatura', '°C'],
+    ['umid', 'Umidade', '%'],
+    ['dist', 'Distância (portão)', 'cm'],
+    ['pir',  'Movimento', ''],
+    ['luz',  'Luminosidade', '']
+  ];
+
+  // Atuadores: [dispositivo, nome, botões [rótulo, valor enviado]]
+  const ATUADORES = [
+    ['luz_sala',   'Luz da sala',   [['Ligar', 1], ['Desligar', 0]]],
+    ['luz_quarto', 'Luz do quarto', [['Ligar', 1], ['Desligar', 0]]],
+    ['portao',     'Portão',        [['Abrir', 1], ['Fechar', 0]]],
+    ['ventilador', 'Ventilador',    [['Auto', 'auto'], ['Ligar', 'on'], ['Desligar', 'off']]]
+  ];
+
+  // Monta os cards uma única vez
+  $('sensores').innerHTML = SENSORES.map(s =>
+    `<div class="card">
+       <small>${s[1]}</small>
+       <div class="valor"><span id="sen_${s[0]}">--</span> ${s[2]}</div>
+     </div>`).join('');
+
+  $('atuadores').innerHTML = ATUADORES.map(a =>
+    `<div class="card">
+       <small>${a[1]}</small>
+       <div class="valor" id="atu_${a[0]}">--</div>
+       <div class="botoes">
+         ${a[2].map(b => `<button onclick="comando('${a[0]}','${b[1]}')">${b[0]}</button>`).join('')}
+       </div>
+     </div>`).join('');
+
+  // Atualiza a tela com o estado recebido do ESP32
+  function mostrar(d) {
+    texto('sen_temp', d.temp == null ? '--' : d.temp.toFixed(1));
+    texto('sen_umid', d.umid == null ? '--' : Math.round(d.umid));
+    texto('sen_dist', d.dist == null ? '--' : d.dist.toFixed(1));
+    texto('sen_pir',  d.pir ? 'Detectado' : 'Sem movimento');
+    texto('sen_luz',  d.luz);
+
+    texto('atu_luz_sala',   d.luz_sala   ? 'Ligada' : 'Desligada');
+    texto('atu_luz_quarto', d.luz_quarto ? 'Ligada' : 'Desligada');
+    texto('atu_portao',     d.portao     ? 'Aberto' : 'Fechado');
+    texto('atu_ventilador', (d.vent ? 'Ligado' : 'Desligado') + ' (' + d.modo + ')');
+
+    texto('alerta', d.alerta ? 'Alerta: ' + d.alerta : '');
+    $('alerta').style.display = d.alerta ? 'block' : 'none';
+  }
+
+  // Faz a requisição ao ESP32 e mostra o resultado
+  async function chamar(url) {
+    try {
+      const resposta = await fetch(url, {cache: 'no-store'});
+      mostrar(await resposta.json());
+      texto('status', 'Conectado ao ESP32');
+      $('status').style.color = '#25764e';
+    } catch (erro) {
+      console.log(erro);
+      texto('status', 'Erro: ' + erro.message);
+      $('status').style.color = '#c0392b';
+    }
+  }
+
+  // Envia um comando (ex.: /api/cmd?dev=luz_sala&val=1)
+  const comando = (dispositivo, valor) =>
+    chamar('/api/cmd?dev=' + dispositivo + '&val=' + valor);
+
+  // Lê o estado ao abrir e a cada 2 segundos
+  chamar('/api/estado');
+  setInterval(() => chamar('/api/estado'), 2000);
+</script>
+</body>
+</html>
