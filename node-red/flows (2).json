@@ -1,0 +1,717 @@
+[
+    {
+        "id": "cc75426cc1f703c2",
+        "type": "tab",
+        "label": "Automação Residencial",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "e9d51b9ec32bf50f",
+        "type": "mqtt in",
+        "z": "cc75426cc1f703c2",
+        "name": "",
+        "topic": "casa-inteligente-m2-umc/telemetria",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "0c0d87391c4da994",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 560,
+        "y": 360,
+        "wires": [
+            [
+                "c2e6679e23936531"
+            ]
+        ]
+    },
+    {
+        "id": "c2e6679e23936531",
+        "type": "function",
+        "z": "cc75426cc1f703c2",
+        "name": "Separar telemetria",
+        "func": "const d = msg.payload;\nif (!d || typeof d !== 'object') return null;\n\n// guarda a última leitura para o registro a cada 2 horas\nflow.set('ultima_telemetria', d);\n\nconst a = d.atuadores || {};\nreturn [\n  {payload: d.temperatura},\n  {payload: d.umidade},\n  {payload: d.distancia},\n  {payload: d.movimento},\n  {payload: d.luminosidade},\n  {payload: {ligado: !!a.luz_sala}},\n  {payload: {ligado: !!a.luz_quarto}},\n  {payload: {ligado: !!a.portao}},\n  {payload: {ligado: !!a.ventilador, modo: a.modo_ventilador}},\n  null\n];",
+        "outputs": 10,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 770,
+        "y": 360,
+        "wires": [
+            [
+                "ed0bb6065d8db9f5"
+            ],
+            [
+                "5cef349d85abc5c1"
+            ],
+            [
+                "17b12135984cbf61"
+            ],
+            [
+                "61abd6cea140cd19"
+            ],
+            [
+                "33f8b8ab2d76f7c0"
+            ],
+            [
+                "66f7ded9b428e635"
+            ],
+            [
+                "c1748fd30d61d572"
+            ],
+            [
+                "685ed3a9034e9c7f"
+            ],
+            [
+                "f375406fe45d0249"
+            ],
+            []
+        ]
+    },
+    {
+        "id": "ed0bb6065d8db9f5",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "0a79c8e349b0e44b",
+        "page": "",
+        "ui": "",
+        "name": "Card Temperatura",
+        "order": 1,
+        "width": "3",
+        "height": "3",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>TEMPERATURA</span><span class=\"ico\">🌡️</span></div>\n    <div class=\"val\">{{ msg?.payload != null ? Number(msg.payload).toFixed(1) : '--' }}<small>°C</small></div>\n    <div class=\"st\" :class=\"{warn: msg?.payload >= 30}\">{{ msg?.payload >= 30 ? 'Temperatura elevada' : '● Leitura em tempo real' }}</div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "noerr": 0,
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 200,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "5cef349d85abc5c1",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "0a79c8e349b0e44b",
+        "page": "",
+        "ui": "",
+        "name": "Card Umidade",
+        "order": 2,
+        "width": "3",
+        "height": "3",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>UMIDADE DO AR</span><span class=\"ico\">💧</span></div>\n    <div class=\"val\">{{ msg?.payload != null ? Math.round(msg.payload) : '--' }}<small>%</small></div>\n    <div class=\"st\" :class=\"{warn: false}\">{{ '● Leitura em tempo real' }}</div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 240,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "17b12135984cbf61",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "0a79c8e349b0e44b",
+        "page": "",
+        "ui": "",
+        "name": "Card Distância",
+        "order": 3,
+        "width": "3",
+        "height": "3",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>DISTÂNCIA (PORTÃO)</span><span class=\"ico\">📏</span></div>\n    <div class=\"val\">{{ msg?.payload != null ? Number(msg.payload).toFixed(1) : '--' }}<small>cm</small></div>\n    <div class=\"st\" :class=\"{warn: msg?.payload != null && msg.payload <= 20}\">{{ msg?.payload != null && msg.payload <= 20 ? 'Objeto próximo ao portão' : '● Leitura em tempo real' }}</div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 280,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "61abd6cea140cd19",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "0a79c8e349b0e44b",
+        "page": "",
+        "ui": "",
+        "name": "Card Movimento",
+        "order": 4,
+        "width": "3",
+        "height": "3",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>MOVIMENTO (PIR)</span><span class=\"ico\">🚶</span></div>\n    <div class=\"val\">{{ msg?.payload == 1 ? 'Detectado' : 'Sem movimento' }}<small></small></div>\n    <div class=\"st\" :class=\"{warn: false}\">{{ '● Leitura em tempo real' }}</div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 320,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "33f8b8ab2d76f7c0",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "0a79c8e349b0e44b",
+        "page": "",
+        "ui": "",
+        "name": "Card Luminosidade",
+        "order": 5,
+        "width": "6",
+        "height": "3",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>LUMINOSIDADE (LDR)</span><span class=\"ico\">☀️</span></div>\n    <div class=\"val\">{{ msg?.payload != null ? msg.payload : '--' }}<small>(leitura 0–4095)</small></div>\n    <div class=\"st\" :class=\"{warn: false}\">{{ '● Leitura em tempo real' }}</div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 360,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "66f7ded9b428e635",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "b83cbfefe91be39a",
+        "page": "",
+        "ui": "",
+        "name": "Card Luz da Sala",
+        "order": 1,
+        "width": "3",
+        "height": "4",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>LUZ DA SALA</span><span class=\"ico\">💡</span></div>\n    <div class=\"val\" :class=\"msg?.payload?.ligado ? 'on' : 'off'\">{{ msg?.payload?.ligado ? 'LIGADA' : 'DESLIGADA' }}</div>\n    <div class=\"st\"></div>\n    <div class=\"btns\" style=\"margin-top:12px\">\n      <button class=\"main\" @click=\"send({payload: 'ON'})\">Ligar</button>\n      <button class=\"\" @click=\"send({payload: 'OFF'})\">Desligar</button>\n    </div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 440,
+        "wires": [
+            [
+                "17e34822596c0248"
+            ]
+        ]
+    },
+    {
+        "id": "17e34822596c0248",
+        "type": "mqtt out",
+        "z": "cc75426cc1f703c2",
+        "name": "",
+        "topic": "casa-inteligente-m2-umc/atuadores/luz_sala",
+        "qos": "0",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "0c0d87391c4da994",
+        "x": 1290,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "c1748fd30d61d572",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "b83cbfefe91be39a",
+        "page": "",
+        "ui": "",
+        "name": "Card Luz do Quarto",
+        "order": 2,
+        "width": "3",
+        "height": "4",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>LUZ DO QUARTO</span><span class=\"ico\">🛏️</span></div>\n    <div class=\"val\" :class=\"msg?.payload?.ligado ? 'on' : 'off'\">{{ msg?.payload?.ligado ? 'LIGADA' : 'DESLIGADA' }}</div>\n    <div class=\"st\"></div>\n    <div class=\"btns\" style=\"margin-top:12px\">\n      <button class=\"main\" @click=\"send({payload: 'ON'})\">Ligar</button>\n      <button class=\"\" @click=\"send({payload: 'OFF'})\">Desligar</button>\n    </div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 500,
+        "wires": [
+            [
+                "b93d11c5725b2411"
+            ]
+        ]
+    },
+    {
+        "id": "b93d11c5725b2411",
+        "type": "mqtt out",
+        "z": "cc75426cc1f703c2",
+        "name": "",
+        "topic": "casa-inteligente-m2-umc/atuadores/luz_quarto",
+        "qos": "0",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "0c0d87391c4da994",
+        "x": 1290,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "685ed3a9034e9c7f",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "b83cbfefe91be39a",
+        "page": "",
+        "ui": "",
+        "name": "Card Portão",
+        "order": 3,
+        "width": "3",
+        "height": "4",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>PORTÃO</span><span class=\"ico\">🚪</span></div>\n    <div class=\"val\" :class=\"msg?.payload?.ligado ? 'on' : 'off'\">{{ msg?.payload?.ligado ? 'ABERTO' : 'FECHADO' }}</div>\n    <div class=\"st\"></div>\n    <div class=\"btns\" style=\"margin-top:12px\">\n      <button class=\"main\" @click=\"send({payload: 'ABRIR'})\">Abrir</button>\n      <button class=\"\" @click=\"send({payload: 'FECHAR'})\">Fechar</button>\n    </div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 560,
+        "wires": [
+            [
+                "575697fe4f110c57"
+            ]
+        ]
+    },
+    {
+        "id": "575697fe4f110c57",
+        "type": "mqtt out",
+        "z": "cc75426cc1f703c2",
+        "name": "",
+        "topic": "casa-inteligente-m2-umc/atuadores/portao",
+        "qos": "0",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "0c0d87391c4da994",
+        "x": 1290,
+        "y": 560,
+        "wires": []
+    },
+    {
+        "id": "f375406fe45d0249",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "b83cbfefe91be39a",
+        "page": "",
+        "ui": "",
+        "name": "Card Ventilador",
+        "order": 4,
+        "width": "3",
+        "height": "4",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>VENTILADOR</span><span class=\"ico\">🌀</span></div>\n    <div class=\"val\" :class=\"msg?.payload?.ligado ? 'on' : 'off'\">{{ msg?.payload?.ligado ? 'LIGADO' : 'DESLIGADO' }}</div>\n    <div class=\"st\">{{ 'Modo: ' + (msg?.payload?.modo ?? '--') }}</div>\n    <div class=\"btns\" style=\"margin-top:12px\">\n      <button class=\"main\" @click=\"send({payload: 'AUTO'})\">Automático</button>\n      <button class=\"\" @click=\"send({payload: 'ON'})\">Ligar</button>\n      <button class=\"\" @click=\"send({payload: 'OFF'})\">Desligar</button>\n    </div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 620,
+        "wires": [
+            [
+                "13488cc590c6d9f5"
+            ]
+        ]
+    },
+    {
+        "id": "13488cc590c6d9f5",
+        "type": "mqtt out",
+        "z": "cc75426cc1f703c2",
+        "name": "",
+        "topic": "casa-inteligente-m2-umc/atuadores/ventilador",
+        "qos": "0",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "0c0d87391c4da994",
+        "x": 1290,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "408350b60d29a02c",
+        "type": "mqtt in",
+        "z": "cc75426cc1f703c2",
+        "name": "",
+        "topic": "casa-inteligente-m2-umc/alertas",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "0c0d87391c4da994",
+        "nl": false,
+        "rap": false,
+        "rh": 0,
+        "inputs": 0,
+        "x": 560,
+        "y": 760,
+        "wires": [
+            [
+                "4e46197c4ff50eb7"
+            ]
+        ]
+    },
+    {
+        "id": "4e46197c4ff50eb7",
+        "type": "function",
+        "z": "cc75426cc1f703c2",
+        "name": "Preparar alerta",
+        "func": "const a = msg.payload;\nif (!a || typeof a !== 'object') return null;\n\nconst quando = new Date().toLocaleString('pt-BR', {timeZone: 'America/Sao_Paulo'});\n\n// histórico dos últimos 5 alertas para o dashboard\nlet hist = flow.get('historico_alertas') || [];\nhist.unshift({quando: quando, mensagem: a.mensagem, valor: a.valor});\nhist = hist.slice(0, 5);\nflow.set('historico_alertas', hist);\n\n// 1) dashboard\nconst dash = {payload: {ultimos: hist}};\n\n// 2) Google Sheets (aba \"Alertas\")\nconst planilha = {\n  payload: {aba: 'Alertas', linha: [quando, a.tipo, a.mensagem, a.valor]},\n  headers: {'Content-Type': 'application/json'}\n};\n\n// 3) e-mail\nconst email = {\n  topic: 'ALERTA - Casa Inteligente: ' + a.mensagem,\n  payload: 'Alerta registrado em ' + quando + '\\n\\n' +\n           'Tipo: ' + a.tipo + '\\n' +\n           'Mensagem: ' + a.mensagem + '\\n' +\n           'Valor: ' + a.valor\n};\n\nreturn [dash, planilha, email];",
+        "outputs": 3,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 770,
+        "y": 760,
+        "wires": [
+            [
+                "25f5b6996522a7fa"
+            ],
+            [
+                "bfa472dc352c8b35"
+            ],
+            [
+                "77bf7c28e5f378e4"
+            ]
+        ]
+    },
+    {
+        "id": "25f5b6996522a7fa",
+        "type": "ui-template",
+        "z": "cc75426cc1f703c2",
+        "group": "7f7296dd03b59d4b",
+        "page": "",
+        "ui": "",
+        "name": "Card Alertas",
+        "order": 1,
+        "width": "12",
+        "height": "4",
+        "head": "",
+        "format": "\n<template>\n  <div class=\"card\">\n    <div class=\"head\"><span>ÚLTIMOS ALERTAS</span><span class=\"ico\">🚨</span></div>\n    <ul class=\"lista\" v-if=\"msg?.payload?.ultimos?.length\">\n      <li v-for=\"(a, i) in msg.payload.ultimos\" :key=\"i\">\n        <strong>{{ a.quando }}</strong> — {{ a.mensagem }} (valor: {{ a.valor }})\n      </li>\n    </ul>\n    <div class=\"st\" v-else>● Nenhum alerta recebido ainda</div>\n  </div>\n</template>\n\n<style>\n.card{background:#fff;border:1px solid #e1e8df;border-radius:16px;padding:20px;color:#24372a;font-family:Arial,sans-serif;box-sizing:border-box;width:100%}\n.head{display:flex;align-items:center;justify-content:space-between;color:#657568;font-size:12px;font-weight:700;letter-spacing:.5px}\n.ico{font-size:24px}\n.val{font-size:34px;font-weight:700;margin:16px 0}\n.val small{font-size:16px;color:#657568;margin-left:5px}\n.st{color:#218447;font-size:12px}\n.st.warn{color:#c0392b;font-weight:700}\n.btns{display:flex;gap:8px;flex-wrap:wrap}\n.btns button{flex:1;padding:9px 10px;border:1px solid #0d74ce;border-radius:8px;background:#fff;color:#0d74ce;font-weight:700;cursor:pointer}\n.btns button.main{background:#0d74ce;color:#fff}\n.btns button:hover{opacity:.85}\n.on{color:#218447}.off{color:#657568}\n.lista{margin:12px 0 0;padding:0;list-style:none;font-size:13px}\n.lista li{padding:6px 0;border-top:1px solid #eef1ec}\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1030,
+        "y": 760,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "bfa472dc352c8b35",
+        "type": "http request",
+        "z": "cc75426cc1f703c2",
+        "name": "Planilha: Alertas",
+        "method": "POST",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "https://script.google.com/macros/s/AKfycbzCkvrpXHRTUdsLlitGc6xHugbSkh_aaiKObwQ1OZSEKkWTgYsKh_9_6_uVTRlvvhUv_g/exec",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 1050,
+        "y": 820,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "e7db0886c609dbdd",
+        "type": "inject",
+        "z": "cc75426cc1f703c2",
+        "name": "A cada 5 min",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "300",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 560,
+        "y": 960,
+        "wires": [
+            [
+                "33bb42f53a72a9ac"
+            ]
+        ]
+    },
+    {
+        "id": "33bb42f53a72a9ac",
+        "type": "function",
+        "z": "cc75426cc1f703c2",
+        "name": "Montar linha dos sensores",
+        "func": "const d = flow.get('ultima_telemetria');\nif (!d) return null;   // ainda não chegou nenhuma leitura\n\nconst a = d.atuadores || {};\nconst quando = new Date().toLocaleString('pt-BR', {timeZone: 'America/Sao_Paulo'});\n\nmsg.headers = {'Content-Type': 'application/json'};\nmsg.payload = {\n  aba: 'Sensores',\n  linha: [quando, d.temperatura, d.umidade, d.distancia, d.movimento, d.luminosidade,\n          a.luz_sala, a.luz_quarto, a.portao, a.ventilador]\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 790,
+        "y": 960,
+        "wires": [
+            [
+                "7e57bc502a123e52"
+            ]
+        ]
+    },
+    {
+        "id": "7e57bc502a123e52",
+        "type": "http request",
+        "z": "cc75426cc1f703c2",
+        "name": "Planilha: Sensores",
+        "method": "POST",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "https://script.google.com/macros/s/AKfycbzCkvrpXHRTUdsLlitGc6xHugbSkh_aaiKObwQ1OZSEKkWTgYsKh_9_6_uVTRlvvhUv_g/exec",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 1070,
+        "y": 960,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "606119036528c2b5",
+        "type": "comment",
+        "z": "cc75426cc1f703c2",
+        "name": "Prefixo MQTT usado: casa-inteligente-m2-umc (igual ao secrets.py)",
+        "info": "",
+        "x": 660,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "77bf7c28e5f378e4",
+        "type": "e-mail",
+        "z": "cc75426cc1f703c2",
+        "server": "smtp.gmail.com",
+        "port": "465",
+        "authtype": "BASIC",
+        "saslformat": true,
+        "token": "oauth2Response.access_token",
+        "secure": true,
+        "tls": true,
+        "name": "",
+        "dname": "E-mail ao proprietário",
+        "x": 1050,
+        "y": 880,
+        "wires": []
+    },
+    {
+        "id": "0c0d87391c4da994",
+        "type": "mqtt-broker",
+        "name": "hivemq",
+        "broker": "broker.hivemq.com",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "0a79c8e349b0e44b",
+        "type": "ui-group",
+        "name": "Sensores",
+        "page": "d80eb16fa73ddae2",
+        "width": 6,
+        "height": 1,
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default",
+        "tab": ""
+    },
+    {
+        "id": "b83cbfefe91be39a",
+        "type": "ui-group",
+        "name": "Atuadores",
+        "page": "d80eb16fa73ddae2",
+        "width": 6,
+        "height": 1,
+        "order": 2,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default",
+        "tab": ""
+    },
+    {
+        "id": "7f7296dd03b59d4b",
+        "type": "ui-group",
+        "name": "Alertas",
+        "page": "d80eb16fa73ddae2",
+        "width": 12,
+        "height": 1,
+        "order": 3,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default",
+        "tab": ""
+    },
+    {
+        "id": "d80eb16fa73ddae2",
+        "type": "ui-page",
+        "name": "Casa Inteligente",
+        "ui": "e69a40e667772966",
+        "path": "/casa",
+        "icon": "home",
+        "layout": "grid",
+        "theme": "088a8af3b7f617b5",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": 0,
+                "cols": 3
+            },
+            {
+                "name": "Tablet",
+                "px": 576,
+                "cols": 6
+            },
+            {
+                "name": "Small Desktop",
+                "px": 768,
+                "cols": 9
+            },
+            {
+                "name": "Desktop",
+                "px": 1024,
+                "cols": 12
+            }
+        ],
+        "tabs": [],
+        "order": 2,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "e69a40e667772966",
+        "type": "ui-base",
+        "name": "My Dashboard",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "page",
+        "navigationStyle": "default",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 1,
+        "showDisconnectNotification": true,
+        "allowInstall": false
+    },
+    {
+        "id": "088a8af3b7f617b5",
+        "type": "ui-theme",
+        "name": "Default Theme",
+        "colors": {
+            "surface": "#fcfcfd",
+            "primary": "#0d74ce",
+            "bgPage": "#f9f9fb",
+            "groupBg": "#ffffff",
+            "groupOutline": "#d9d9e0"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
+        }
+    },
+    {
+        "id": "b774e2b6fec3ca8b",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "@flowfuse/node-red-dashboard": "1.34.1",
+            "node-red-node-email": "5.2.5"
+        }
+    }
+]
